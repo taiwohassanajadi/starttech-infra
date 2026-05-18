@@ -43,3 +43,6 @@ output "backend_ecr_repository_url" {
 output "backend_log_group_name" {
   value = aws_cloudwatch_log_group.backend.name
 }
+output "redis_endpoint" {
+  value = aws_elasticache_cluster.redis.cache_nodes[0].address
+}
