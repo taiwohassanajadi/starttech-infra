@@ -257,3 +257,29 @@ resource "aws_security_group" "redis" {
     Environment = var.environment
   }
 }
+resource "aws_ecr_repository" "backend" {
+  name                 = "${local.name_prefix}-backend"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name        = "${local.name_prefix}-backend-ecr"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_cloudwatch_log_group" "backend" {
+  name              = "/${var.project_name}/${var.environment}/backend"
+  retention_in_days = 7
+
+  tags = {
+    Name        = "${local.name_prefix}-backend-logs"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}

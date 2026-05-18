@@ -36,3 +36,10 @@ output "backend_security_group_id" {
 output "redis_security_group_id" {
   value = aws_security_group.redis.id
 }
+output "backend_ecr_repository_url" {
+  value = aws_ecr_repository.backend.repository_url
+}
+
+output "backend_log_group_name" {
+  value = aws_cloudwatch_log_group.backend.name
+}
