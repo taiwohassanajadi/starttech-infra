@@ -21,3 +21,7 @@ output "private_subnet_ids" {
   description = "Private subnet IDs"
   value       = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 }
+output "nat_gateway_id" {
+  description = "NAT Gateway ID"
+  value       = aws_nat_gateway.main.id
+}
