@@ -25,3 +25,14 @@ output "nat_gateway_id" {
   description = "NAT Gateway ID"
   value       = aws_nat_gateway.main.id
 }
+output "alb_security_group_id" {
+  value = aws_security_group.alb.id
+}
+
+output "backend_security_group_id" {
+  value = aws_security_group.backend.id
+}
+
+output "redis_security_group_id" {
+  value = aws_security_group.redis.id
+}
