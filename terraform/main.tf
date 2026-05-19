@@ -530,3 +530,83 @@ EOF
     Environment = var.environment
   }
 }
+resource "aws_lb" "backend" {
+  name               = "${local.name_prefix}-backend-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+
+  tags = {
+    Name        = "${local.name_prefix}-backend-alb"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_lb_target_group" "backend" {
+  name     = "${local.name_prefix}-backend-tg"
+  port     = 8080
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path                = "/health"
+    protocol            = "HTTP"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
+
+  tags = {
+    Name        = "${local.name_prefix}-backend-tg"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_lb_listener" "backend_http" {
+  load_balancer_arn = aws_lb.backend.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+}
+
+resource "aws_autoscaling_group" "backend" {
+  name                = "${local.name_prefix}-backend-asg"
+  desired_capacity    = 2
+  min_size            = 2
+  max_size            = 3
+  vpc_zone_identifier = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+  target_group_arns   = [aws_lb_target_group.backend.arn]
+  health_check_type   = "ELB"
+
+  launch_template {
+    id      = aws_launch_template.backend.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "${local.name_prefix}-backend-asg-instance"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Project"
+    value               = var.project_name
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Environment"
+    value               = var.environment
+    propagate_at_launch = true
+  }
+}
