@@ -418,3 +418,40 @@ resource "aws_s3_bucket_policy" "frontend" {
     ]
   })
 }
+resource "aws_iam_role" "backend_ec2" {
+  name = "${local.name_prefix}-backend-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${local.name_prefix}-backend-ec2-role"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "backend_ecr_readonly" {
+  role       = aws_iam_role.backend_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "backend_cloudwatch" {
+  role       = aws_iam_role.backend_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_instance_profile" "backend" {
+  name = "${local.name_prefix}-backend-instance-profile"
+  role = aws_iam_role.backend_ec2.name
+}

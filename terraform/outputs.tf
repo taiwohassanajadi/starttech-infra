@@ -57,3 +57,10 @@ output "cloudfront_distribution_id" {
 output "cloudfront_domain_name" {
   value = aws_cloudfront_distribution.frontend.domain_name
 }
+output "backend_ec2_role_name" {
+  value = aws_iam_role.backend_ec2.name
+}
+
+output "backend_instance_profile_name" {
+  value = aws_iam_instance_profile.backend.name
+}
