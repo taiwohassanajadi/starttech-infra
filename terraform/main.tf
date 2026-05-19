@@ -20,6 +20,22 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+
+  owners = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023.*-x86_64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -454,4 +470,63 @@ resource "aws_iam_role_policy_attachment" "backend_cloudwatch" {
 resource "aws_iam_instance_profile" "backend" {
   name = "${local.name_prefix}-backend-instance-profile"
   role = aws_iam_role.backend_ec2.name
+}
+resource "aws_launch_template" "backend" {
+  name_prefix   = "${local.name_prefix}-backend-"
+  image_id      = data.aws_ami.amazon_linux.id
+  instance_type = "t3.micro"
+
+  vpc_security_group_ids = [
+    aws_security_group.backend.id
+  ]
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.backend.name
+  }
+
+  user_data = base64encode(<<-EOF
+#!/bin/bash
+dnf update -y
+
+dnf install -y docker
+
+systemctl enable docker
+systemctl start docker
+
+usermod -aG docker ec2-user
+
+aws ecr get-login-password --region ${var.aws_region} | \
+docker login --username AWS --password-stdin ${aws_ecr_repository.backend.repository_url}
+
+docker pull ${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}
+
+docker run -d \
+  --name backend \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e MONGO_URI='${var.mongo_uri}' \
+  -e JWT_SECRET_KEY='${var.jwt_secret_key}' \
+  -e DB_NAME=starttechdb \
+  -e ENABLE_CACHE=true \
+  -e REDIS_ADDR='${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379' \
+  -e LOG_LEVEL=INFO \
+  ${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}
+EOF
+  )
+
+  tag_specifications {
+    resource_type = "instance"
+
+    tags = {
+      Name        = "${local.name_prefix}-backend-instance"
+      Project     = var.project_name
+      Environment = var.environment
+    }
+  }
+
+  tags = {
+    Name        = "${local.name_prefix}-backend-launch-template"
+    Project     = var.project_name
+    Environment = var.environment
+  }
 }
