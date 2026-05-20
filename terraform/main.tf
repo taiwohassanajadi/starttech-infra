@@ -462,6 +462,11 @@ resource "aws_iam_role_policy_attachment" "backend_ecr_readonly" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_role_policy_attachment" "backend_ssm" {
+  role       = aws_iam_role.backend_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 resource "aws_iam_role_policy_attachment" "backend_cloudwatch" {
   role       = aws_iam_role.backend_ec2.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
@@ -483,7 +488,6 @@ resource "aws_launch_template" "backend" {
   iam_instance_profile {
     name = aws_iam_instance_profile.backend.name
   }
-
   user_data = base64encode(<<-EOF
 #!/bin/bash
 dnf update -y
@@ -493,27 +497,21 @@ dnf install -y docker
 systemctl enable docker
 systemctl start docker
 
-usermod -aG docker ec2-user
-
-aws ecr get-login-password --region ${var.aws_region} | \
-docker login --username AWS --password-stdin ${aws_ecr_repository.backend.repository_url}
+aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.backend.repository_url}
 
 docker pull ${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}
 
-docker run -d \
-  --name backend \
-  -p 8080:8080 \
+docker run -d --name backend -p 8080:8080 \
   -e PORT=8080 \
-  -e MONGO_URI='${var.mongo_uri}' \
-  -e JWT_SECRET_KEY='${var.jwt_secret_key}' \
+  -e MONGO_URI=${var.mongo_uri} \
+  -e JWT_SECRET_KEY=${var.jwt_secret_key} \
   -e DB_NAME=starttechdb \
   -e ENABLE_CACHE=true \
-  -e REDIS_ADDR='${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379' \
+  -e REDIS_ADDR="${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379" \
   -e LOG_LEVEL=INFO \
   ${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}
 EOF
   )
-
   tag_specifications {
     resource_type = "instance"
 
